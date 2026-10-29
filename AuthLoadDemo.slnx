@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/AuthApi/AuthApi.csproj" />
+  <Project Path="src/IntegrationTests/AuthApi.IntegrationTests.csproj" />
+</Solution>
+

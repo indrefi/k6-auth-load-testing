@@ -1,0 +1,47 @@
+name: k6appload
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/AuthApi.Dockerfile
+    environment:
+      DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE: "false"
+      Auth__Username: ${AUTH_USERNAME:-load-user}
+      Auth__Password: ${AUTH_PASSWORD:-change-me-now}
+      Auth__JwtSigningKey: ${JWT_SIGNING_KEY:-development-only-signing-key-change-this-32-bytes}
+      Auth__ClientCertificateAuthorityPath: /certs/ca-cert.pem
+      Https__ServerCertificatePath: /certs/server-cert.pem
+      Https__ServerCertificateKeyPath: /certs/server-key.pem
+    volumes:
+      - ../certificates/generated:/certs:ro
+    ports:
+      - "8443:8443"
+    restart: unless-stopped
+
+  k6:
+    image: grafana/k6:latest
+    user: "0:0"
+    working_dir: /work/load-tests
+    environment:
+      K6_CONFIG_FILE: ${DOCKER_K6_CONFIG_FILE:-/work/load-tests/config.json}
+      K6_APPLICATION_URL_OVERRIDE: ${DOCKER_APPLICATION_URL:-https://api:8443}
+      K6_CLIENT_CERT_FILE: ${DOCKER_CLIENT_CERT_PATH-/work/certificates/generated/client-cert.pem}
+      K6_CLIENT_KEY_FILE: ${DOCKER_CLIENT_KEY_PATH-/work/certificates/generated/client-key.pem}
+      SSL_CERT_FILE: ${DOCKER_CA_CERT_PATH-/work/certificates/generated/ca-cert.pem}
+      DURATION: ${DURATION:-}
+      RATE: ${RATE:-}
+      SPIKE_VUS: ${SPIKE_VUS:-}
+      START_RATE: ${START_RATE:-}
+      MID_RATE: ${MID_RATE:-}
+      MAX_RATE: ${MAX_RATE:-}
+      MAX_VUS: ${MAX_VUS:-}
+      K6_WEB_DASHBOARD: "true"
+      K6_WEB_DASHBOARD_PORT: "-1"
+      K6_WEB_DASHBOARD_PERIOD: 1s
+    volumes:
+      - ..:/work
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - load

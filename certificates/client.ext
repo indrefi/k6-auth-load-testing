@@ -1,0 +1,6 @@
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=clientAuth
+authorityKeyIdentifier=keyid,issuer
+subjectKeyIdentifier=hash
+

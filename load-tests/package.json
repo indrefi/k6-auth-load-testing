@@ -1,0 +1,20 @@
+{
+  "name": "auth-load-demo-reporting",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dashboard": "node reporting/generate-dashboard.mjs",
+    "export:xlsx": "node reporting/export-xlsx.mjs",
+    "export:history-xlsx": "node reporting/export-history-xlsx.mjs",
+    "export:pdf": "node reporting/html-to-pdf.mjs",
+    "report": "npm run dashboard && npm run export:history-xlsx && npm run export:pdf",
+    "report:all": "node reporting/generate-all-reports.mjs"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "playwright": "1.56.1"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}

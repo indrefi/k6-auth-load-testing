@@ -1,0 +1,110 @@
+{
+  "applicationUrl": "https://localhost:8443",
+  "startDemoApi": true,
+  "healthPath": "/health",
+  "certificate": {
+    "caPath": "../certificates/generated/ca-cert.pem",
+    "clientCertificatePath": "../certificates/generated/client-cert.pem",
+    "clientKeyPath": "../certificates/generated/client-key.pem"
+  },
+  "jwt": {
+    "loginPath": "/api/auth/login",
+    "username": "load-user",
+    "password": "change-me-now",
+    "loginPayload": {
+      "username": "{{username}}",
+      "password": "{{password}}"
+    },
+    "tokenField": "accessToken",
+    "expiresInField": "expiresIn"
+  },
+  "basic": {
+    "username": "load-user",
+    "password": "change-me-now"
+  },
+  "requests": {
+    "OPEN_GET": [
+      {
+        "name": "open-get-data",
+        "enabled": true,
+        "path": "/api/open/data",
+        "expectedStatus": 200
+      }
+    ],
+    "OPEN_POST": [
+      {
+        "name": "open-post-data",
+        "enabled": true,
+        "path": "/api/open/data",
+        "expectedStatus": 201,
+        "payload": {
+          "value": "open-{{vu}}-{{iteration}}"
+        }
+      }
+    ],
+    "JWT_GET": [
+      {
+        "name": "jwt-get-data",
+        "enabled": true,
+        "path": "/api/jwt/data",
+        "expectedStatus": 200
+      }
+    ],
+    "JWT_POST": [
+      {
+        "name": "jwt-post-data",
+        "enabled": true,
+        "path": "/api/jwt/data",
+        "expectedStatus": 201,
+        "payload": {
+          "value": "jwt-{{vu}}-{{iteration}}"
+        }
+      }
+    ],
+    "CERTIFICATE_GET": [
+      {
+        "name": "certificate-get-data",
+        "enabled": true,
+        "path": "/api/certificate/data",
+        "expectedStatus": 200
+      }
+    ],
+    "CERTIFICATE_POST": [
+      {
+        "name": "certificate-post-data",
+        "enabled": true,
+        "path": "/api/certificate/data",
+        "expectedStatus": 201,
+        "payload": {
+          "value": "certificate-{{vu}}-{{iteration}}"
+        }
+      }
+    ],
+    "BASIC_GET": [
+      {
+        "name": "basic-get-data",
+        "enabled": true,
+        "path": "/api/basic/data",
+        "expectedStatus": 200
+      }
+    ],
+    "BASIC_POST": [
+      {
+        "name": "basic-post-data",
+        "enabled": true,
+        "path": "/api/basic/data",
+        "expectedStatus": 201,
+        "payload": {
+          "value": "basic-{{vu}}-{{iteration}}"
+        }
+      }
+    ]
+  },
+  "testSettings": {
+    "thinkTimeSeconds": 0.1,
+    "p95LimitMilliseconds": 500,
+    "errorRateLimit": 0.01,
+    "noConnectionReuse": false,
+    "insecureSkipTlsVerify": false
+  }
+}

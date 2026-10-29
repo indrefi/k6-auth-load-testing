@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>k6 Load Test Dashboard</title>
+  <style>
+    :root { color-scheme: light; --bg:#f3f6fb; --surface:#fff; --ink:#172033; --muted:#667085; --line:#dce3ee; --blue:#2764d8; --cyan:#0891b2; --orange:#e97817; --red:#cf3f4f; --green:#138a61; --purple:#7655c7; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { padding:28px 32px 22px; color:#fff; background:linear-gradient(120deg,#101b36,#173c78); }
+    header h1 { margin:0 0 5px; font-size:28px; font-weight:650; }
+    header p { margin:0; color:#c9d6ee; }
+    main { max-width:1500px; margin:auto; padding:24px 28px 48px; }
+    .filters { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+    label,.filter-field > span { color:var(--muted); font-size:12px; font-weight:600; }
+    select { display:block; width:100%; margin-top:5px; padding:9px 10px; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:7px; }
+    .filter-field { min-width:0; }
+    .filter-field > span { display:block; }
+    .multi-select { position:relative; margin-top:5px; }
+    .multi-select > summary { display:flex; align-items:center; justify-content:space-between; width:100%; padding:9px 10px; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:7px; cursor:pointer; list-style:none; font-size:13px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .multi-select > summary::-webkit-details-marker { display:none; }
+    .multi-select > summary::after { content:'▾'; margin-left:8px; color:var(--muted); }
+    .multi-select[open] > summary { border-radius:7px 7px 0 0; }
+    .multi-menu { position:absolute; z-index:20; top:100%; left:0; right:0; max-height:280px; overflow:auto; padding:6px; background:var(--surface); border:1px solid var(--line); border-top:0; border-radius:0 0 7px 7px; box-shadow:0 10px 24px rgba(29,48,86,.14); }
+    .multi-option { display:flex; align-items:center; gap:8px; padding:7px 6px; color:var(--ink); font-size:13px; font-weight:400; cursor:pointer; }
+    .multi-option:hover { background:#f7f9fc; }
+    .multi-option.all-option { padding-bottom:9px; margin-bottom:3px; border-bottom:1px solid var(--line); font-weight:600; }
+    .multi-option input { margin:0; accent-color:var(--blue); }
+    .run-actions { display:flex; justify-content:flex-end; gap:10px; margin:-8px 0 20px; }
+    .action-button { display:inline-flex; align-items:center; min-height:36px; padding:8px 13px; color:#fff; background:var(--blue); border:1px solid var(--blue); border-radius:7px; font-size:13px; font-weight:650; text-decoration:none; }
+    .action-button:hover { background:#1e55bd; }
+    .action-button.disabled { color:var(--muted); background:#eef2f7; border-color:var(--line); pointer-events:none; }
+    .summary,.panel { background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:0 3px 14px rgba(29,48,86,.05); }
+    .summary { margin-bottom:20px; overflow:hidden; }
+    .summary table { font-size:14px; }
+    .summary th:first-child,.summary td:first-child { text-align:left; }
+    .summary th:not(:first-child),.summary td:not(:first-child) { text-align:right; }
+    .auth-name { font-weight:650; text-transform:capitalize; }
+    .auth-name i { display:inline-block; width:9px; height:9px; margin-right:7px; border-radius:50%; }
+    .no-data { color:var(--muted); font-size:12px; }
+    .status-good { color:var(--green); } .status-bad { color:var(--red); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:20px; }
+    .panel { padding:18px; min-width:0; }
+    .panel.full { grid-column:1/-1; }
+    .history-panel > summary { display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none; user-select:none; }
+    .history-panel > summary::-webkit-details-marker { display:none; }
+    .history-panel > summary::before { content:'▸'; color:var(--blue); font-size:16px; transition:transform .15s ease; }
+    .history-panel[open] > summary::before { transform:rotate(90deg); }
+    .history-panel > summary h2 { margin:0; }
+    .history-panel > .subtitle { margin-top:6px; }
+    h2 { margin:0 0 4px; font-size:17px; font-weight:650; }
+    .subtitle { margin:0 0 14px; color:var(--muted); font-size:12px; }
+    .chart { width:100%; min-height:245px; }
+    svg { display:block; width:100%; height:auto; overflow:hidden; }
+    .axis { fill:var(--muted); font-size:11px; }
+    .grid-line { stroke:var(--line); stroke-width:1; }
+    .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; color:var(--muted); font-size:12px; }
+    .legend i { display:inline-block; width:10px; height:3px; margin-right:5px; vertical-align:middle; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+    th,td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+    th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
+    tbody tr:hover { background:#f7f9fc; }
+    .empty { padding:48px 12px; color:var(--muted); text-align:center; }
+    .run-link { color:var(--blue); font-weight:600; }
+    footer { padding-top:8px; color:var(--muted); font-size:12px; }
+    @media(max-width:1000px) { .filters{grid-template-columns:repeat(2,1fr)} }
+    @media(max-width:720px) { main{padding:18px 12px} header{padding:22px 16px} .grid{grid-template-columns:1fr} .filters{grid-template-columns:1fr} }
+    @media print { body{background:#fff} header{background:#173c78!important;print-color-adjust:exact} main{max-width:none;padding:16px}.filters,.run-actions{display:none}.panel,.summary{box-shadow:none;break-inside:avoid}.grid{break-inside:auto} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>k6 Load Test Dashboard</h1>
+  </header>
+  <main>
+    <section class="filters" aria-label="Dashboard filters">
+      <label>Test type<select id="type-filter"></select></label>
+      <label>Test run<select id="run-filter"></select></label>
+      <div class="filter-field"><span>Authentication</span><details id="auth-filter" class="multi-select"><summary id="auth-filter-label">All authentication</summary><div id="auth-options" class="multi-menu"></div></details></div>
+      <div class="filter-field"><span>API request</span><details id="request-filter" class="multi-select"><summary id="request-filter-label">All API requests</summary><div id="request-options" class="multi-menu"></div></details></div>
+    </section>
+
+    <section class="run-actions" aria-label="Selected run reports">
+      <a id="native-report-link" class="action-button" target="_blank" rel="noopener">Open native k6 report</a>
+    </section>
+
+    <section class="summary table-wrap" aria-label="Selected authentication summary">
+      <table>
+        <thead><tr><th>Authentication</th><th>Requests</th><th>Requests / second</th><th>Response p95</th><th>Error rate</th><th>Run max VUs</th><th>Run breaking point</th></tr></thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+    </section>
+
+    <section class="grid">
+      <details class="panel full history-panel" open>
+        <summary><h2>Test history: p95 response time</h2></summary>
+        <p class="subtitle">One bar per saved run for the selected test type.</p>
+        <div id="history-chart" class="chart"></div>
+      </details>
+      <article class="panel">
+        <h2>Response time over the run</h2>
+        <p class="subtitle">Average and p95 in milliseconds, separated by authentication when All authentication is selected.</p>
+        <div id="latency-chart" class="chart"></div>
+      </article>
+      <article class="panel">
+        <h2>Request rate</h2>
+        <p class="subtitle">Observed requests per second, separated by authentication when All authentication is selected.</p>
+        <div id="rps-chart" class="chart"></div>
+      </article>
+      <article class="panel">
+        <h2>Virtual users</h2>
+        <p class="subtitle">VUs apply to the complete scenario rather than to one endpoint.</p>
+        <div id="vu-chart" class="chart"></div>
+      </article>
+      <article class="panel">
+        <h2>Error rate over time</h2>
+        <p class="subtitle">Failed HTTP requests by authentication as a percentage of requests in each time bucket.</p>
+        <div id="error-chart" class="chart"></div>
+      </article>
+      <article class="panel full">
+        <h2>API request performance</h2>
+        <p class="subtitle">Per-request timing, volume, errors and returned HTTP status codes.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Request</th><th>Auth</th><th>Method</th><th>Count</th><th>Avg ms</th><th>P90 ms</th><th>P95 ms</th><th>P99 ms</th><th>Max ms</th><th>Error %</th><th>Status codes</th></tr></thead>
+          <tbody id="endpoint-body"></tbody>
+        </table></div>
+      </article>
+      <article class="panel full">
+        <h2>Saved test runs</h2>
+        <p class="subtitle">Every run is retained in its own results folder and included in comparisons.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Run</th><th>Type</th><th>Started UTC</th><th>Duration</th><th>Requests</th><th>RPS</th><th>Max VUs</th><th>P95 ms</th><th>P99 ms</th><th>Error %</th><th>Dropped</th><th>Breaking point</th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table></div>
+      </article>
+    </section>
+    <footer id="generated-at"></footer>
+  </main>
+  <script>
+    const dashboardData = __DASHBOARD_DATA__;
+    const defaultRunId = __DEFAULT_RUN_ID__;
+    const colors = { blue:'#2764d8', cyan:'#0891b2', orange:'#e97817', red:'#cf3f4f', green:'#138a61', purple:'#7655c7', gray:'#667085' };
+    const authColors = { open:colors.blue, jwt:colors.cyan, certificate:colors.purple, basic:colors.orange, unknown:colors.gray };
+    const authOrder = ['open','jwt','certificate','basic'];
+    const typeFilter = document.getElementById('type-filter');
+    const runFilter = document.getElementById('run-filter');
+    const authFilter = document.getElementById('auth-filter');
+    const requestFilter = document.getElementById('request-filter');
+    const authFilterLabel = document.getElementById('auth-filter-label');
+    const requestFilterLabel = document.getElementById('request-filter-label');
+    const authOptions = document.getElementById('auth-options');
+    const requestOptions = document.getElementById('request-options');
+    const nativeReportLink = document.getElementById('native-report-link');
+    let availableAuthentications = [];
+    let availableRequests = [];
+    let selectedAuthentications = new Set();
+    let selectedRequests = new Set();
+    let authenticationInitialized = false;
+    let requestInitialized = false;
+
+    function option(value, text = value) { const item=document.createElement('option'); item.value=value; item.textContent=text; return item; }
+    function selectedRun() { return dashboardData.runs.find((run) => run.id === runFilter.value) || dashboardData.runs.at(-1); }
+    function runsForType() { return dashboardData.runs.filter((run) => run.type === typeFilter.value); }
+    function format(value, digits=1) { return Number.isFinite(Number(value)) ? Number(value).toLocaleString(undefined,{maximumFractionDigits:digits}) : '—'; }
+    function percent(value) { return `${format(Number(value)*100,2)}%`; }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character])); }
+
+    function updateNativeReportLink(run) {
+      const currentDirectory=decodeURIComponent(new URL('.',window.location.href).pathname).replace(/\/$/,'').split('/').pop();
+      const isRunDashboard=dashboardData.runs.some((item)=>item.resultDirectory===currentDirectory);
+      const prefix=isRunDashboard?'../':'./';
+      nativeReportLink.href=`${prefix}${encodeURIComponent(run.resultDirectory)}/k6-native-report.html`;
+      nativeReportLink.classList.toggle('disabled',!run.hasNativeReport);
+      nativeReportLink.setAttribute('aria-disabled',String(!run.hasNativeReport));
+      nativeReportLink.title=run.hasNativeReport?'Open the selected run’s native k6 dashboard in a new tab':'This run does not contain k6-native-report.html';
+    }
+
+    function initialize() {
+      const types=[...new Set(dashboardData.runs.map((run)=>run.type))].sort();
+      const preferred=dashboardData.runs.find((run)=>run.id===defaultRunId) || dashboardData.runs.at(-1);
+      typeFilter.replaceChildren(...types.map((type)=>option(type)));
+      if (preferred) typeFilter.value=preferred.type;
+      populateRuns(preferred?.id);
+      populateEndpointFilters();
+      typeFilter.addEventListener('change',()=>{populateRuns();populateEndpointFilters();render();});
+      runFilter.addEventListener('change',()=>{populateEndpointFilters();render();});
+      document.addEventListener('click',(event)=>{
+        if(authFilter.open&&!authFilter.contains(event.target))authFilter.removeAttribute('open');
+        if(requestFilter.open&&!requestFilter.contains(event.target))requestFilter.removeAttribute('open');
+      });
+      render();
+    }
+
+    function populateRuns(preferredId) {
+      const runs=runsForType();
+      runFilter.replaceChildren(...runs.map((run)=>option(run.id,`${run.type} · ${run.startedAt || run.id}`)));
+      if (preferredId && runs.some((run)=>run.id===preferredId)) runFilter.value=preferredId;
+      else if (runs.length) runFilter.value=runs.at(-1).id;
+    }
+
+    function populateEndpointFilters() {
+      const run=selectedRun();
+      const authTypes=availableAuthTypes(run);
+      const previouslyAll=authenticationInitialized&&availableAuthentications.length>0&&availableAuthentications.every((auth)=>selectedAuthentications.has(auth));
+      availableAuthentications=authTypes;
+      selectedAuthentications=!authenticationInitialized||previouslyAll
+        ? new Set(authTypes)
+        : new Set(authTypes.filter((auth)=>selectedAuthentications.has(auth)));
+      authenticationInitialized=true;
+      renderAuthenticationOptions();
+      populateRequests();
+    }
+
+    function populateRequests() {
+      const run=selectedRun();
+      const previouslyAll=requestInitialized&&availableRequests.length>0&&availableRequests.every((name)=>selectedRequests.has(name));
+      const endpoints=(run?.endpoints||[]).filter((endpoint)=>selectedAuthentications.has(endpoint.authType));
+      const names=[...new Set(endpoints.map((endpoint)=>endpoint.name))].sort();
+      availableRequests=names;
+      selectedRequests=!requestInitialized||previouslyAll
+        ? new Set(names)
+        : new Set(names.filter((name)=>selectedRequests.has(name)));
+      requestInitialized=true;
+      renderRequestOptions();
+    }
+
+    function checkboxOption(value,text,checked,indeterminate,onChange,isAll=false) {
+      const wrapper=document.createElement('label');wrapper.className=`multi-option${isAll?' all-option':''}`;
+      const input=document.createElement('input');input.type='checkbox';input.value=value;input.checked=checked;input.indeterminate=indeterminate;
+      const caption=document.createElement('span');caption.textContent=text;
+      input.addEventListener('change',()=>onChange(input.checked));
+      wrapper.append(input,caption);
+      return wrapper;
+    }
+
+    function selectionLabel(selected,available,allText,singularText) {
+      if(available.length>0&&selected.size===available.length)return allText;
+      if(selected.size===0)return `No ${singularText}`;
+      if(selected.size===1)return [...selected][0];
+      return `${selected.size} ${singularText}s selected`;
+    }
+
+    function renderAuthenticationOptions() {
+      const allSelected=availableAuthentications.length>0&&selectedAuthentications.size===availableAuthentications.length;
+      authFilterLabel.textContent=selectionLabel(selectedAuthentications,availableAuthentications,'All authentication','authentication type');
+      const allOption=checkboxOption('all','All authentication',allSelected,selectedAuthentications.size>0&&!allSelected,(checked)=>{
+        selectedAuthentications=checked?new Set(availableAuthentications):new Set();
+        renderAuthenticationOptions();populateRequests();render();
+      },true);
+      const options=availableAuthentications.map((auth)=>checkboxOption(auth,auth,selectedAuthentications.has(auth),false,(checked)=>{
+        if(checked)selectedAuthentications.add(auth);else selectedAuthentications.delete(auth);
+        renderAuthenticationOptions();populateRequests();render();
+      }));
+      authOptions.replaceChildren(allOption,...options);
+    }
+
+    function renderRequestOptions() {
+      const allSelected=availableRequests.length>0&&selectedRequests.size===availableRequests.length;
+      requestFilterLabel.textContent=selectionLabel(selectedRequests,availableRequests,'All API requests','API request');
+      const allOption=checkboxOption('all','All API requests',allSelected,selectedRequests.size>0&&!allSelected,(checked)=>{
+        selectedRequests=checked?new Set(availableRequests):new Set();
+        renderRequestOptions();render();
+      },true);
+      const options=availableRequests.map((name)=>checkboxOption(name,name,selectedRequests.has(name),false,(checked)=>{
+        if(checked)selectedRequests.add(name);else selectedRequests.delete(name);
+        renderRequestOptions();render();
+      }));
+      requestOptions.replaceChildren(allOption,...options);
+    }
+
+    function availableAuthTypes(run) {
+      const available=[...new Set((run?.endpoints||[]).map((endpoint)=>endpoint.authType))];
+      return available.sort((left,right)=>{
+        const leftIndex=authOrder.indexOf(left),rightIndex=authOrder.indexOf(right);
+        return (leftIndex<0?authOrder.length:leftIndex)-(rightIndex<0?authOrder.length:rightIndex)||left.localeCompare(right);
+      });
+    }
+
+    function selectedAuthTypes(run) {
+      return availableAuthTypes(run).filter((auth)=>selectedAuthentications.has(auth));
+    }
+
+    function endpointsForAuth(run,auth) {
+      return (run?.endpoints||[]).filter((endpoint)=>endpoint.authType===auth&&selectedRequests.has(endpoint.name));
+    }
+
+    function timelineMetrics(point,auth) {
+      const matches=point.endpoints.filter((endpoint)=>endpoint.authType===auth&&selectedRequests.has(endpoint.name));
+      const requests=matches.reduce((sum,item)=>sum+item.rps,0);
+      return {
+        hasLatency:matches.length>0,
+        rps:requests,
+        avg:matches.length?matches.reduce((sum,item)=>sum+item.avg*item.rps,0)/Math.max(1,requests):null,
+        p95:matches.length?Math.max(...matches.map((item)=>item.p95)):null,
+        errorPercent:matches.length?matches.reduce((sum,item)=>sum+item.errorRate*item.rps,0)/Math.max(1,requests)*100:null,
+      };
+    }
+
+    function authenticationChart(run,authTypes) {
+      const points=run.timeline.map((point)=>{
+        const result={elapsed:point.elapsed};
+        for(const auth of authTypes){const metrics=timelineMetrics(point,auth);result[`${auth}-avg`]=metrics.avg;result[`${auth}-p95`]=metrics.p95;result[`${auth}-rps`]=metrics.rps;result[`${auth}-errors`]=metrics.errorPercent;}
+        return result;
+      });
+      return {
+        points,
+        latencySeries:authTypes.flatMap((auth)=>[
+          {label:`${auth} p95`,key:`${auth}-p95`,color:authColors[auth]||colors.gray},
+          {label:`${auth} average`,key:`${auth}-avg`,color:authColors[auth]||colors.gray,dash:'5 4'},
+        ]),
+        rpsSeries:authTypes.map((auth)=>({label:auth,key:`${auth}-rps`,color:authColors[auth]||colors.gray})),
+        errorSeries:authTypes.map((auth)=>({label:auth,key:`${auth}-errors`,color:authColors[auth]||colors.gray})),
+      };
+    }
+
+    function renderSummary(run,authTypes) {
+      const breakpoint=run.breakingPoint?`${format(run.breakingPoint.rps,1)} RPS`:'Not reached';
+      document.getElementById('summary-body').innerHTML=authTypes.map((auth)=>{
+        const endpoints=endpointsForAuth(run,auth);
+        const count=endpoints.reduce((sum,endpoint)=>sum+endpoint.count,0);
+        const p95=endpoints.length?Math.max(...endpoints.map((endpoint)=>endpoint.p95)):null;
+        const errors=endpoints.length?endpoints.reduce((sum,endpoint)=>sum+endpoint.errorRate*endpoint.count,0)/Math.max(1,count):null;
+        const noData='<span class="no-data">No data</span>';
+        return `<tr><td class="auth-name"><i style="background:${authColors[auth]||colors.gray}"></i>${escapeHtml(auth)}</td><td>${endpoints.length?format(count,0):noData}</td><td>${endpoints.length?format(count/Math.max(1,run.durationSeconds),1):noData}</td><td>${endpoints.length?`${format(p95,1)} ms`:noData}</td><td>${endpoints.length?percent(errors):noData}</td><td>${format(run.maxVus,0)}</td><td class="${run.breakingPoint?'status-bad':'status-good'}">${breakpoint}</td></tr>`;
+      }).join('');
+    }
+
+    function render() {
+      const run=selectedRun();
+      if (!run) { document.querySelector('main').innerHTML='<div class="empty">No saved test runs yet. Run a k6 scenario to create the dashboard.</div>'; return; }
+      const authTypes=selectedAuthTypes(run);
+      const endpoints=authTypes.flatMap((auth)=>endpointsForAuth(run,auth));
+      const chart=authenticationChart(run,authTypes);
+      updateNativeReportLink(run);
+      renderSummary(run,authTypes);
+      barChart('history-chart',runsForType(),(item)=>item.latency.p95,(item)=>item.id,'ms');
+      lineChart('latency-chart',chart.points,chart.latencySeries,'ms');
+      lineChart('rps-chart',chart.points,chart.rpsSeries,'req/s');
+      lineChart('vu-chart',run.timeline,[{label:'Virtual users',key:'vus',color:colors.purple}],'VUs');
+      lineChart('error-chart',chart.points,chart.errorSeries,'%');
+      renderEndpointTable(endpoints);
+      renderHistoryTable(runsForType());
+      document.getElementById('generated-at').textContent=`Generated ${dashboardData.generatedAt} · Selected run: ${run.id} · Target: ${run.applicationUrl || 'not recorded'}`;
+    }
+
+    function lineChart(id,points,series,unit) {
+      const element=document.getElementById(id); if(!points.length){element.innerHTML='<div class="empty">No data</div>';return;}
+      const width=720,height=245,left=52,right=18,top=15,bottom=36,plotWidth=width-left-right,plotHeight=height-top-bottom;
+      const maxX=Math.max(1,...points.map((point)=>point.elapsed));
+      const numericValues=series.flatMap((item)=>points.map((point)=>point[item.key]).filter((value)=>value!==null&&value!==undefined).map(Number).filter(Number.isFinite));
+      const maxY=Math.max(1,...numericValues)*1.08;
+      const x=(value)=>left+(value/maxX)*plotWidth; const y=(value)=>top+plotHeight-(value/maxY)*plotHeight;
+      let svg=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(unit)} over elapsed test time">`;
+      for(let index=0;index<=4;index++){const value=maxY*index/4;const py=y(value);svg+=`<line class="grid-line" x1="${left}" x2="${width-right}" y1="${py}" y2="${py}"/><text class="axis" x="${left-8}" y="${py+4}" text-anchor="end">${format(value,1)}</text>`;}
+      for(let index=0;index<=4;index++){const value=maxX*index/4;svg+=`<text class="axis" x="${x(value)}" y="${height-10}" text-anchor="middle">${format(value,maxX<10?1:0)}s</text>`;}
+      for(const item of series){let drawing=false;const path=points.map((point)=>{const raw=point[item.key];const value=raw===null||raw===undefined?Number.NaN:Number(raw);if(!Number.isFinite(value)){drawing=false;return '';}const command=drawing?'L':'M';drawing=true;return `${command}${x(point.elapsed).toFixed(1)},${y(value).toFixed(1)}`;}).filter(Boolean).join(' ');svg+=`<path d="${path}" fill="none" stroke="${item.color}" stroke-width="2.5"${item.dash?` stroke-dasharray="${item.dash}"`:''}/>`;}
+      svg+=`<text class="axis" x="14" y="${top+plotHeight/2}" transform="rotate(-90 14 ${top+plotHeight/2})" text-anchor="middle">${escapeHtml(unit)}</text></svg><div class="legend">${series.map((item)=>`<span><i style="background:${item.color}"></i>${escapeHtml(item.label)}</span>`).join('')}</div>`;
+      element.innerHTML=svg;
+    }
+
+    function barChart(id,items,value,label,unit) {
+      const element=document.getElementById(id); if(!items.length){element.innerHTML='<div class="empty">No data</div>';return;}
+      const width=1200,height=260,left=52,right=18,top=18,bottom=68,plotWidth=width-left-right,plotHeight=height-top-bottom;
+      const maxY=Math.max(1,...items.map(value))*1.1; const slot=plotWidth/items.length; const barWidth=Math.max(4,Math.min(54,slot*.65));
+      let svg=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="p95 response time by test run">`;
+      for(let index=0;index<=4;index++){const amount=maxY*index/4;const py=top+plotHeight-(amount/maxY)*plotHeight;svg+=`<line class="grid-line" x1="${left}" x2="${width-right}" y1="${py}" y2="${py}"/><text class="axis" x="${left-8}" y="${py+4}" text-anchor="end">${format(amount,maxY<10?1:0)}</text>`;}
+      items.forEach((item,index)=>{const amount=value(item);const h=(amount/maxY)*plotHeight;const x=left+slot*index+(slot-barWidth)/2;const text=String(label(item));svg+=`<rect x="${x}" y="${top+plotHeight-h}" width="${barWidth}" height="${h}" rx="2" fill="${colors.blue}"/><text class="axis" x="${x+barWidth/2}" y="${top+plotHeight-h-5}" text-anchor="middle">${format(amount,1)}</text><text class="axis" x="${x+barWidth/2}" y="${height-46}" transform="rotate(35 ${x+barWidth/2} ${height-46})" text-anchor="start">${escapeHtml(text.length>28?text.slice(0,28)+'…':text)}</text>`;});
+      svg+=`<text class="axis" x="14" y="${top+plotHeight/2}" transform="rotate(-90 14 ${top+plotHeight/2})" text-anchor="middle">${unit}</text></svg>`;element.innerHTML=svg;
+    }
+
+    function renderEndpointTable(endpoints) {
+      document.getElementById('endpoint-body').innerHTML=endpoints.map((endpoint)=>`<tr><td>${escapeHtml(endpoint.name)}</td><td>${escapeHtml(endpoint.authType)}</td><td>${escapeHtml(endpoint.operation)}</td><td>${format(endpoint.count,0)}</td><td>${format(endpoint.avg,2)}</td><td>${format(endpoint.p90,2)}</td><td>${format(endpoint.p95,2)}</td><td>${format(endpoint.p99,2)}</td><td>${format(endpoint.max,2)}</td><td>${percent(endpoint.errorRate)}</td><td>${escapeHtml(Object.entries(endpoint.statuses).map(([status,count])=>`${status}: ${count}`).join(', '))}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No matching requests</td></tr>';
+    }
+
+    function renderHistoryTable(runs) {
+      document.getElementById('history-body').innerHTML=[...runs].reverse().map((run)=>`<tr><td class="run-link">${escapeHtml(run.id)}</td><td>${escapeHtml(run.type)}</td><td>${escapeHtml(run.startedAt)}</td><td>${format(run.durationSeconds,1)}s</td><td>${format(run.totalRequests,0)}</td><td>${format(run.requestsPerSecond,1)}</td><td>${format(run.maxVus,0)}</td><td>${format(run.latency.p95,2)}</td><td>${format(run.latency.p99,2)}</td><td>${percent(run.errorRate)}</td><td>${format(run.droppedIterations,0)}</td><td>${run.breakingPoint?`${format(run.breakingPoint.rps,1)} RPS`:'Not reached'}</td></tr>`).join('');
+    }
+
+    initialize();
+  </script>
+</body>
+</html>

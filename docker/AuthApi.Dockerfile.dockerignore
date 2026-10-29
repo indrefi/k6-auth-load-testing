@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.DS_Store
+**/.env
+.git/
+certificates/generated/
+load-tests/node_modules/
+load-tests/results/
