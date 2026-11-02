@@ -438,6 +438,34 @@ Set the application URL, credentials, optional certificate paths, and request li
 
 Use `"startDemoApi": false` when the target is an external system. Remove `caPath` when the server uses a publicly trusted certificate. Client certificate and key paths are needed only when at least one enabled certificate-authenticated request exists. Remove `healthPath` when the external API has no health endpoint. Paths in this file are relative to `load-tests/`.
 
+#### Docker k6 calling an HTTPS API on the local machine
+
+When the API runs directly on the same machine but k6 runs in Docker, `localhost` and `127.0.0.1` inside the k6 container refer to the container itself. The runner therefore converts a configured local URL such as `https://localhost:8449` to `https://host.docker.internal:8449` and keeps the port unchanged.
+
+TLS validates both certificate trust and hostname. The API server certificate must therefore contain the hostname that k6 actually calls. A certificate valid only for `localhost` will fail when Docker k6 connects to `host.docker.internal`.
+
+Use one of these approaches:
+
+1. **Preferred simple option: run k6 locally.** Install k6 on the host and keep `applicationUrl` as `https://localhost:<port>`. The runner automatically uses the local k6 executable, and a certificate containing `localhost` remains valid.
+2. **Use Docker's standard host name.** Keep Docker k6 and issue the API certificate with `DNS:host.docker.internal` in its Subject Alternative Name list. The existing Compose configuration already maps `host.docker.internal` to `host-gateway` for Linux compatibility.
+3. **Use a custom local hostname.** For example, issue the API certificate for `local-api.test`, set `applicationUrl` to `https://local-api.test:8449`, and add the following mapping to the `k6` service in `docker/docker-compose.yml`:
+
+   ```yaml
+   extra_hosts:
+     - "host.docker.internal:host-gateway"
+     - "local-api.test:host-gateway"
+   ```
+
+   The certificate must contain `DNS:local-api.test`. Add the same name to the host operating system's hosts file only if browsers, curl, or other host processes also need to use it:
+
+   - Windows: `C:\Windows\System32\drivers\etc\hosts`
+   - macOS/Linux: `/etc/hosts`
+
+   A host operating-system hosts-file entry alone is insufficient: Docker containers do not inherit custom entries from the host's hosts file. The `extra_hosts` entry is what makes the name resolve inside the k6 container.
+4. **Diagnostic only: disable verification.** Set `testSettings.insecureSkipTlsVerify` to `true` only to confirm that TLS verification is the blocker. This disables server-certificate trust and hostname verification and should not be the normal configuration.
+
+For a local API on Linux, ensure it listens on an interface reachable through the Docker host gateway rather than only on `127.0.0.1`. Remote hostnames are not translated: a URL such as `https://api.example.com:8449` remains unchanged and its certificate must contain `api.example.com`.
+
 Each request category is an array, so it can contain zero, one, or many endpoints:
 
 ```json
@@ -849,6 +877,7 @@ Never commit `certificates/generated/`; it contains private keys and is ignored 
 - **PowerShell certificate generation cannot find OpenSSL:** install OpenSSL for Windows, ensure `openssl.exe` is on `PATH`, and open a new PowerShell session.
 - **Certificate route returns 401:** send both `client-cert.pem` and `client-key.pem`; do not send the server certificate.
 - **k6 reports unknown certificate authority:** set `certificate.caPath` in `config.json`. The runner passes it to k6 automatically.
+- **Docker k6 reports that a certificate is valid for `localhost` but not `host.docker.internal`:** use a server certificate containing `host.docker.internal`, run k6 locally, or configure a certificate-backed custom hostname with Compose `extra_hosts` as described under **Docker k6 calling an HTTPS API on the local machine**. Do not rely only on the host operating system's hosts file.
 - **PDF export says no browser is installed:** run `cd load-tests && npx playwright install chromium`.
 - **A stress/breakpoint command exits 99:** k6 uses exit code 99 for a failed threshold. The reports are still generated and should be inspected.
 - **PowerShell blocks a Windows script:** run `Set-ExecutionPolicy -Scope Process Bypass`, then execute the certificate generator or load-test runner again. This changes policy only for the current PowerShell process.
